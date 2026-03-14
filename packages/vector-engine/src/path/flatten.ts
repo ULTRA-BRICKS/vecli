@@ -248,7 +248,7 @@ function flattenArc(
   for (let i = 0; i < nSegs; i++) {
     const a0 = startAngle + i * segAngle;
     const a1 = startAngle + (i + 1) * segAngle;
-    arcSegmentToCubic(cx, cy, absRx, absRy, phi, cosPhi, sinPhi, a0, a1, tolerance, out);
+    arcSegmentToCubic(cx, cy, absRx, absRy, cosPhi, sinPhi, a0, a1, tolerance, out);
   }
 
   // Snap the final point to the exact arc endpoint — cubic approximation accumulates
@@ -281,7 +281,6 @@ function arcSegmentToCubic(
   cy: number,
   rx: number,
   ry: number,
-  phi: number,
   cosPhi: number,
   sinPhi: number,
   a0: number,
