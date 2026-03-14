@@ -5,7 +5,7 @@
  *
  * Assumptions: arc bounds use SVG spec §B.2.4 endpoint-to-center parameterization —
  * rotation is applied to the ellipse axes, not the coordinate system.
- * Architecture: https://hyperide.github.io/reports/vector-engine-spec
+ * Architecture: https://hyperide.github.io/reports/HYP-308
  */
 
 import type { BoundingBox } from '../types';
