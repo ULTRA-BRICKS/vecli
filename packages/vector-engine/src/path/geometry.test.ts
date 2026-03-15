@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { encodeCommands, PathCmd } from './commands';
-import { pathArea, pathLength } from './geometry';
+import { pathArea, pathLength, pointAtOffset } from './geometry';
 
 describe('pathLength', () => {
   it('should compute line segment length', () => {
@@ -120,5 +120,114 @@ describe('pathArea', () => {
       { type: PathCmd.Close },
     ]);
     expect(Math.abs(pathArea(cmds))).toBeCloseTo(20000, 0);
+  });
+});
+
+describe('pointAtOffset', () => {
+  it('should return start point at offset 0', () => {
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Line, x: 100, y: 0 },
+    ]);
+    const pt = pointAtOffset(cmds, 0);
+    expect(pt.point.x).toBeCloseTo(0, 5);
+    expect(pt.point.y).toBeCloseTo(0, 5);
+  });
+
+  it('should return end point at offset 1', () => {
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Line, x: 100, y: 0 },
+    ]);
+    const pt = pointAtOffset(cmds, 1);
+    expect(pt.point.x).toBeCloseTo(100, 5);
+    expect(pt.point.y).toBeCloseTo(0, 5);
+  });
+
+  it('should return midpoint at offset 0.5', () => {
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Line, x: 100, y: 0 },
+    ]);
+    const pt = pointAtOffset(cmds, 0.5);
+    expect(pt.point.x).toBeCloseTo(50, 5);
+  });
+
+  it('should return tangent direction', () => {
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Line, x: 100, y: 0 },
+    ]);
+    const pt = pointAtOffset(cmds, 0.5);
+    expect(pt.tangent.x).toBeCloseTo(1, 5);
+    expect(pt.tangent.y).toBeCloseTo(0, 5);
+  });
+
+  it('should return perpendicular normal', () => {
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Line, x: 100, y: 0 },
+    ]);
+    const pt = pointAtOffset(cmds, 0.5);
+    expect(Math.abs(pt.normal.x)).toBeCloseTo(0, 5);
+    expect(Math.abs(pt.normal.y)).toBeCloseTo(1, 5);
+  });
+
+  it('should handle multi-segment path', () => {
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Line, x: 100, y: 0 },
+      { type: PathCmd.Line, x: 100, y: 100 },
+    ]);
+    // Total length = 200, offset 0.75 → at distance 150
+    // First segment is 100, second goes from (100,0) to (100,100)
+    // At distance 150: 50 units into second segment → (100, 50)
+    const pt = pointAtOffset(cmds, 0.75);
+    expect(pt.point.x).toBeCloseTo(100, 1);
+    expect(pt.point.y).toBeCloseTo(50, 1);
+  });
+
+  it('should handle cubic bezier path', () => {
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Cubic, cx1: 33, cy1: 100, cx2: 66, cy2: 100, x: 100, y: 0 },
+    ]);
+    const pt = pointAtOffset(cmds, 0.5);
+    // Midpoint of this symmetric cubic should be around (50, 75)
+    expect(pt.point.x).toBeCloseTo(50, 0);
+    expect(pt.point.y).toBeGreaterThan(50);
+  });
+
+  it('should handle quadratic bezier path — midpoint on curve', () => {
+    // M0 0 Q50 100 100 0 — midpoint at t=0.5 is (50, 50), not (50, 0) as chord would give
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Quad, cx: 50, cy: 100, x: 100, y: 0 },
+    ]);
+    const pt = pointAtOffset(cmds, 0.5);
+    expect(pt.point.y).toBeGreaterThan(30);
+  });
+
+  it('should handle arc path — midpoint on curve', () => {
+    // Quarter circle: M50 0 A50 50 0 0 1 0 50 — midpoint should be near (35, 15)
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 50, y: 0 },
+      { type: PathCmd.Arc, rx: 50, ry: 50, rotation: 0, largeArc: 0, sweep: 1, x: 0, y: 50 },
+    ]);
+    const pt = pointAtOffset(cmds, 0.5);
+    // Midpoint of quarter arc should be off the chord (not at (25, 25) which is below the arc)
+    const chordMidDist = Math.sqrt((pt.point.x - 25) ** 2 + (pt.point.y - 25) ** 2);
+    expect(chordMidDist).toBeGreaterThan(5);
+  });
+
+  it('should clamp offset to [0, 1]', () => {
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Line, x: 100, y: 0 },
+    ]);
+    const ptNeg = pointAtOffset(cmds, -0.5);
+    expect(ptNeg.point.x).toBeCloseTo(0, 5);
+    const ptOver = pointAtOffset(cmds, 1.5);
+    expect(ptOver.point.x).toBeCloseTo(100, 5);
   });
 });
