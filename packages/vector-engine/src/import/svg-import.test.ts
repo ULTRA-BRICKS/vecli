@@ -7,8 +7,8 @@ describe('SVG import', () => {
     const result = svgToGraph(svg);
     const rectNode = result.nodes.find((n) => n.type === 'rectangle');
     expect(rectNode).toBeDefined();
-    expect(rectNode!.params.width).toBe(80);
-    expect(rectNode!.params.height).toBe(80);
+    expect(rectNode?.params.width).toBe(80);
+    expect(rectNode?.params.height).toBe(80);
   });
 
   it('should import path element as svgPath', () => {
@@ -16,7 +16,7 @@ describe('SVG import', () => {
     const result = svgToGraph(svg);
     const pathNode = result.nodes.find((n) => n.type === 'svgPath');
     expect(pathNode).toBeDefined();
-    expect(pathNode!.params.d).toBe('M 0 0 L 100 0 L 100 100 Z');
+    expect(pathNode?.params.d).toBe('M 0 0 L 100 0 L 100 100 Z');
   });
 
   it('should import fill and stroke', () => {
@@ -39,7 +39,7 @@ describe('SVG import', () => {
     const result = svgToGraph(svg);
     const pathNode = result.nodes.find((n) => n.type === 'svgPath');
     expect(pathNode).toBeDefined();
-    expect(pathNode!.params.d as string).toContain('M');
+    expect(pathNode?.params.d as string).toContain('M');
   });
 
   it('should extract viewBox canvas dimensions', () => {
