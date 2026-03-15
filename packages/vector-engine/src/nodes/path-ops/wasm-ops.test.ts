@@ -7,6 +7,7 @@
 import { describe, expect, it } from 'bun:test';
 import { MockPathOps } from 'vector-wasm';
 import { PathBuilder } from '../../path/builder';
+import type { NodeValue } from '../../types';
 import { createDashNode } from './dash-path';
 import { createOffsetNode } from './offset';
 import { createStrokeToPathNode } from './stroke-to-path';
@@ -27,7 +28,7 @@ describe('WASM path ops nodes', () => {
   it('should run offset node without error', () => {
     const rect = new PathBuilder().moveTo(0, 0).lineTo(100, 0).lineTo(100, 100).lineTo(0, 100).close().build();
     const result = offsetNode.execute({ path: { type: 'path', value: rect } }, { distance: 10 });
-    expect((result.path as any).type).toBe('path');
+    expect((result.path as NodeValue).type).toBe('path');
   });
 
   it('should run stroke-to-path node', () => {
@@ -36,12 +37,13 @@ describe('WASM path ops nodes', () => {
       { path: { type: 'path', value: line } },
       { width: 10, cap: 'round', join: 'round' },
     );
-    expect((result.path as any).value.closed).toBe(true);
+    const pathVal = result.path as NodeValue;
+    expect(pathVal.type === 'path' && pathVal.value.closed).toBe(true);
   });
 
   it('should run dash node', () => {
     const line = new PathBuilder().moveTo(0, 0).lineTo(100, 0).build();
     const result = dashNode.execute({ path: { type: 'path', value: line } }, { dashArray: '[10, 5]', dashOffset: 0 });
-    expect((result.path as any).type).toBe('path');
+    expect((result.path as NodeValue).type).toBe('path');
   });
 });
