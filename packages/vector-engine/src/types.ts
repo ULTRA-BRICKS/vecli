@@ -88,6 +88,34 @@ export interface StyleValue {
   blur?: number;
 }
 
+export interface WidthPoint {
+  offset: number; // 0..1 along path length
+  width: number; // stroke width at this point
+  taper?: 'sharp' | 'round'; // endpoint taper style
+}
+
+// -- Gradient Mesh --
+
+export interface MeshVertex {
+  position: Point;
+  color: string;
+  opacity?: number;
+}
+
+export interface MeshHandle {
+  cp1: Point;
+  cp2: Point;
+}
+
+/** Bicubic gradient mesh: (rows+1) × (cols+1) control points */
+export interface MeshValue {
+  rows: number;
+  cols: number;
+  /** Control points in row-major order: (rows+1) × (cols+1) entries */
+  vertices: MeshVertex[];
+  handles: MeshHandle[];
+}
+
 // -- Node value (discriminated union) --
 
 export type NodeValue =
@@ -96,7 +124,8 @@ export type NodeValue =
   | { type: 'number'; value: number }
   | { type: 'color'; value: string }
   | { type: 'boolean'; value: boolean }
-  | { type: 'transform'; value: TransformMatrix };
+  | { type: 'transform'; value: TransformMatrix }
+  | { type: 'mesh'; value: MeshValue };
 
 export type NodeValueType = NodeValue['type'];
 
