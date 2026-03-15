@@ -94,6 +94,12 @@ export interface WidthPoint {
   taper?: 'sharp' | 'round'; // endpoint taper style
 }
 
+// -- Vector Network --
+
+import type { VectorNetwork } from './network/types';
+
+export type { VectorNetwork, VectorRegion, VectorSegment, VectorVertex } from './network/types';
+
 // -- Gradient Mesh --
 
 export interface MeshVertex {
@@ -125,7 +131,8 @@ export type NodeValue =
   | { type: 'color'; value: string }
   | { type: 'boolean'; value: boolean }
   | { type: 'transform'; value: TransformMatrix }
-  | { type: 'mesh'; value: MeshValue };
+  | { type: 'mesh'; value: MeshValue }
+  | { type: 'network'; value: VectorNetwork };
 
 export type NodeValueType = NodeValue['type'];
 
