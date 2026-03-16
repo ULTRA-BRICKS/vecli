@@ -189,6 +189,8 @@ export function computeBounds(commands: Float64Array): BoundingBox {
         lastY = cmd.y;
         break;
       case PathCmd.Cubic:
+        // Control-point hull approximation — may overestimate by up to ~33%.
+        // Tight bounds (derivative root solving) deferred to v1.x.
         track(cmd.cx1, cmd.cy1);
         track(cmd.cx2, cmd.cy2);
         track(cmd.x, cmd.y);
@@ -196,6 +198,8 @@ export function computeBounds(commands: Float64Array): BoundingBox {
         lastY = cmd.y;
         break;
       case PathCmd.Quad:
+        // Control-point hull approximation — may overestimate by up to ~33%.
+        // Tight bounds (derivative root solving) deferred to v1.x.
         track(cmd.cx, cmd.cy);
         track(cmd.x, cmd.y);
         lastX = cmd.x;
