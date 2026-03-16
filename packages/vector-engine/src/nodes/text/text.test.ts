@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { Font, Path as OpentypePath } from 'opentype.js';
+import { initShaper, resetShaper, shapeText } from './shaper';
 import { registerFont, textToPathNode } from './text-to-path';
 
 describe('text to path', () => {
@@ -91,5 +92,34 @@ describe('text to path', () => {
     // catch block swallows the error; builder.build() still returns empty path
     const pathVal = (result.path as { value: { commands: { length: number } } }).value;
     expect(pathVal.commands.length).toBe(0);
+  });
+});
+
+describe('shapeText', () => {
+  it('should export shapeText function', () => {
+    expect(typeof shapeText).toBe('function');
+  });
+
+  it('should return empty array when no font blob provided', () => {
+    const glyphs = shapeText(null, 'Hello', 24);
+    expect(glyphs).toEqual([]);
+  });
+
+  it('should return empty array for empty text', () => {
+    const glyphs = shapeText(new ArrayBuffer(10), '', 24);
+    expect(glyphs).toEqual([]);
+  });
+
+  it('should return empty when shaper not initialized', () => {
+    resetShaper();
+    const glyphs = shapeText(new ArrayBuffer(10), 'Hello', 24);
+    expect(glyphs).toEqual([]);
+  });
+
+  it('should export initShaper as async function', () => {
+    expect(typeof initShaper).toBe('function');
+    const result = initShaper();
+    expect(result instanceof Promise).toBe(true);
+    return result;
   });
 });
