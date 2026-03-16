@@ -4,10 +4,11 @@
  * Accessed via: Internal module, not exposed
  */
 
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, mock } from 'bun:test';
 import { HistoryManager } from '../graph/history';
 import { VectorGraphModel } from '../graph/vector-graph';
 import type { GraphNode } from '../types';
+import { AutoSave } from './auto-save';
 import { OperationLog } from './operation-log';
 import { deserializeGraph, serializeGraph } from './serialize';
 import { type ExecutionCache, SnapshotManager, type SnapshotStorage } from './snapshot';
@@ -297,5 +298,71 @@ describe('SnapshotManager', () => {
     await mgr.cleanup('snap-', 5);
     const remaining = await storage.list('snap-');
     expect(remaining.length).toBe(2);
+  });
+});
+
+describe('AutoSave', () => {
+  it('should not call save immediately', () => {
+    const saveFn = mock(() => Promise.resolve());
+    const auto = new AutoSave(saveFn, 100);
+    auto.markDirty();
+    expect(saveFn).not.toHaveBeenCalled();
+    auto.dispose();
+  });
+
+  it('should call save after debounce', async () => {
+    const saveFn = mock(() => Promise.resolve());
+    const auto = new AutoSave(saveFn, 10);
+    auto.markDirty();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(saveFn).toHaveBeenCalledTimes(1);
+    auto.dispose();
+  });
+
+  it('should debounce rapid changes', async () => {
+    const saveFn = mock(() => Promise.resolve());
+    const auto = new AutoSave(saveFn, 50);
+    auto.markDirty();
+    await new Promise((r) => setTimeout(r, 20));
+    auto.markDirty();
+    await new Promise((r) => setTimeout(r, 20));
+    auto.markDirty();
+    await new Promise((r) => setTimeout(r, 80));
+    expect(saveFn).toHaveBeenCalledTimes(1);
+    auto.dispose();
+  });
+
+  it('should flush immediately when called', async () => {
+    const saveFn = mock(() => Promise.resolve());
+    const auto = new AutoSave(saveFn, 1000);
+    auto.markDirty();
+    await auto.flush();
+    expect(saveFn).toHaveBeenCalledTimes(1);
+    auto.dispose();
+  });
+
+  it('should not flush when not dirty', async () => {
+    const saveFn = mock(() => Promise.resolve());
+    const auto = new AutoSave(saveFn, 100);
+    await auto.flush();
+    expect(saveFn).not.toHaveBeenCalled();
+    auto.dispose();
+  });
+
+  it('should report dirty state', () => {
+    const auto = new AutoSave(() => Promise.resolve(), 100);
+    expect(auto.isDirty).toBe(false);
+    auto.markDirty();
+    expect(auto.isDirty).toBe(true);
+    auto.dispose();
+  });
+
+  it('should clear dirty flag after flush', async () => {
+    const auto = new AutoSave(() => Promise.resolve(), 100);
+    auto.markDirty();
+    expect(auto.isDirty).toBe(true);
+    await auto.flush();
+    expect(auto.isDirty).toBe(false);
+    auto.dispose();
   });
 });
