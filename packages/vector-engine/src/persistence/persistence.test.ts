@@ -8,7 +8,9 @@ import { describe, expect, it } from 'bun:test';
 import { HistoryManager } from '../graph/history';
 import { VectorGraphModel } from '../graph/vector-graph';
 import type { GraphNode } from '../types';
+import { OperationLog } from './operation-log';
 import { deserializeGraph, serializeGraph } from './serialize';
+import type { VectorGraphState } from './types';
 
 /** Retrieve a node that must exist — throws if not found (test setup error). */
 function mustGetNode(graph: VectorGraphModel, id: string): GraphNode {
@@ -90,5 +92,122 @@ describe('VectorGraphFile serialization', () => {
     const { model: loaded } = deserializeGraph(file);
     const json = loaded.toJSON();
     expect(json.viewport).toEqual({ zoom: 1, panX: 0, panY: 0 });
+  });
+});
+
+function emptyBase(): VectorGraphState {
+  return { canvas: { width: 100, height: 100 }, nodes: {}, edges: [], muted: [] };
+}
+
+describe('OperationLog', () => {
+  it('should append operations', () => {
+    const log = new OperationLog();
+    log.append({ timestamp: 1, description: 'test', diffs: [] });
+    expect(log.length).toBe(1);
+  });
+
+  it('should compact old operations', () => {
+    const log = new OperationLog();
+    for (let i = 0; i < 150; i++) {
+      log.append({ timestamp: i, description: `op-${i}`, diffs: [] });
+    }
+    const { operations } = log.compact(emptyBase(), 100);
+    expect(operations.length).toBe(100);
+    expect(log.length).toBe(100);
+  });
+
+  it('should apply addNode during compaction', () => {
+    const log = new OperationLog();
+    log.append({
+      timestamp: 1,
+      description: 'add rect',
+      diffs: [{ kind: 'addNode', node: { id: 'n1', type: 'rectangle', params: { width: 50 } } }],
+    });
+    log.append({
+      timestamp: 2,
+      description: 'filler',
+      diffs: [],
+    });
+    const { newBase } = log.compact(emptyBase(), 1);
+    expect(newBase.nodes.n1).toBeDefined();
+    expect(newBase.nodes.n1.type).toBe('rectangle');
+  });
+
+  it('should apply paramChange during compaction', () => {
+    const log = new OperationLog();
+    log.append({
+      timestamp: 1,
+      description: 'add rect',
+      diffs: [{ kind: 'addNode', node: { id: 'n1', type: 'rectangle', params: { width: 50 } } }],
+    });
+    log.append({
+      timestamp: 2,
+      description: 'change width',
+      diffs: [{ kind: 'paramChange', nodeId: 'n1', param: 'width', oldValue: 50, newValue: 100 }],
+    });
+    log.append({
+      timestamp: 3,
+      description: 'filler',
+      diffs: [],
+    });
+    const { newBase } = log.compact(emptyBase(), 1);
+    expect(newBase.nodes.n1.params.width).toBe(100);
+  });
+
+  it('should apply removeNode during compaction', () => {
+    const base = emptyBase();
+    base.nodes.n1 = { id: 'n1', type: 'rectangle', params: {} };
+    const log = new OperationLog();
+    log.append({
+      timestamp: 1,
+      description: 'remove rect',
+      diffs: [{ kind: 'removeNode', node: { id: 'n1', type: 'rectangle', params: {} }, removedEdges: [] }],
+    });
+    log.append({ timestamp: 2, description: 'filler', diffs: [] });
+    const { newBase } = log.compact(base, 1);
+    expect(newBase.nodes.n1).toBeUndefined();
+  });
+
+  it('should apply muteNode during compaction', () => {
+    const base = emptyBase();
+    base.nodes.n1 = { id: 'n1', type: 'rectangle', params: {} };
+    const log = new OperationLog();
+    log.append({
+      timestamp: 1,
+      description: 'mute',
+      diffs: [{ kind: 'muteNode', nodeId: 'n1', muted: true }],
+    });
+    log.append({ timestamp: 2, description: 'filler', diffs: [] });
+    const { newBase } = log.compact(base, 1);
+    expect(newBase.muted).toContain('n1');
+  });
+
+  it('should apply moveNode during compaction', () => {
+    const base = emptyBase();
+    base.nodes.n1 = { id: 'n1', type: 'rectangle', params: {}, position: { x: 0, y: 0 } };
+    const log = new OperationLog();
+    log.append({
+      timestamp: 1,
+      description: 'move',
+      diffs: [{ kind: 'moveNode', nodeId: 'n1', oldPosition: { x: 0, y: 0 }, newPosition: { x: 10, y: 20 } }],
+    });
+    log.append({ timestamp: 2, description: 'filler', diffs: [] });
+    const { newBase } = log.compact(base, 1);
+    expect(newBase.nodes.n1.position).toEqual({ x: 10, y: 20 });
+  });
+
+  it('should not compact when under keepCount', () => {
+    const log = new OperationLog();
+    log.append({ timestamp: 1, description: 'test', diffs: [] });
+    const { operations } = log.compact(emptyBase(), 100);
+    expect(operations.length).toBe(1);
+  });
+
+  it('should expose operations as readonly', () => {
+    const log = new OperationLog();
+    log.append({ timestamp: 1, description: 'a', diffs: [] });
+    log.append({ timestamp: 2, description: 'b', diffs: [] });
+    expect(log.operations.length).toBe(2);
+    expect(log.operations[0].description).toBe('a');
   });
 });
