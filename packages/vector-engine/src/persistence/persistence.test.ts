@@ -10,6 +10,7 @@ import { VectorGraphModel } from '../graph/vector-graph';
 import type { GraphNode } from '../types';
 import { OperationLog } from './operation-log';
 import { deserializeGraph, serializeGraph } from './serialize';
+import { type ExecutionCache, SnapshotManager, type SnapshotStorage } from './snapshot';
 import type { VectorGraphState } from './types';
 
 /** Retrieve a node that must exist — throws if not found (test setup error). */
@@ -209,5 +210,92 @@ describe('OperationLog', () => {
     log.append({ timestamp: 2, description: 'b', diffs: [] });
     expect(log.operations.length).toBe(2);
     expect(log.operations[0].description).toBe('a');
+  });
+});
+
+class MapStorage implements SnapshotStorage {
+  private data = new Map<string, string>();
+  async save(key: string, data: string): Promise<void> {
+    this.data.set(key, data);
+  }
+  async load(key: string): Promise<string | null> {
+    return this.data.get(key) ?? null;
+  }
+  async list(prefix: string): Promise<string[]> {
+    return [...this.data.keys()].filter((k) => k.startsWith(prefix));
+  }
+  async remove(key: string): Promise<void> {
+    this.data.delete(key);
+  }
+}
+
+describe('SnapshotManager', () => {
+  it('should save and load exact match', async () => {
+    const storage = new MapStorage();
+    const mgr = new SnapshotManager(storage);
+    const cache: ExecutionCache = { nodeResults: { n1: { hash: 'abc', result: '{}' } } };
+    await mgr.save('hash1', cache);
+    const loaded = await mgr.loadBest('hash1', {});
+    expect(loaded).not.toBeNull();
+    expect(loaded?.nodeResults.n1.hash).toBe('abc');
+  });
+
+  it('should find nearest snapshot when no exact match', async () => {
+    const storage = new MapStorage();
+    const mgr = new SnapshotManager(storage);
+    await mgr.save('old-hash', {
+      nodeResults: {
+        n1: { hash: 'h1', result: '1' },
+        n2: { hash: 'h2', result: '2' },
+      },
+    });
+    const result = await mgr.loadBest('new-hash', { n1: 'h1', n2: 'changed' });
+    expect(result).not.toBeNull();
+    // Should find the old snapshot (1 hit on n1)
+    expect(result?.nodeResults.n1.hash).toBe('h1');
+  });
+
+  it('should prefer snapshot with more matching node hashes', async () => {
+    const storage = new MapStorage();
+    const mgr = new SnapshotManager(storage);
+    await mgr.save('snap-a', {
+      nodeResults: { n1: { hash: 'h1', result: '1' } },
+    });
+    await mgr.save('snap-b', {
+      nodeResults: {
+        n1: { hash: 'h1', result: '1' },
+        n2: { hash: 'h2', result: '2' },
+      },
+    });
+    const result = await mgr.loadBest('new-hash', { n1: 'h1', n2: 'h2' });
+    expect(result).not.toBeNull();
+    expect(result?.nodeResults.n2).toBeDefined();
+  });
+
+  it('should cleanup old snapshots', async () => {
+    const storage = new MapStorage();
+    const mgr = new SnapshotManager(storage);
+    for (let i = 0; i < 5; i++) {
+      await mgr.save(`hash-${i}`, { nodeResults: {} });
+    }
+    await mgr.cleanup('snap-', 3);
+    const remaining = await storage.list('snap-');
+    expect(remaining.length).toBe(3);
+  });
+
+  it('should return null when no snapshots exist', async () => {
+    const storage = new MapStorage();
+    const mgr = new SnapshotManager(storage);
+    expect(await mgr.loadBest('any', {})).toBeNull();
+  });
+
+  it('should not cleanup when under keepCount', async () => {
+    const storage = new MapStorage();
+    const mgr = new SnapshotManager(storage);
+    await mgr.save('hash-0', { nodeResults: {} });
+    await mgr.save('hash-1', { nodeResults: {} });
+    await mgr.cleanup('snap-', 5);
+    const remaining = await storage.list('snap-');
+    expect(remaining.length).toBe(2);
   });
 });
