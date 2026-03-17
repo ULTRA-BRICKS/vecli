@@ -5,9 +5,15 @@
  */
 
 import { describe, expect, it } from 'bun:test';
+import { sceneToSvg } from '../export/svg';
+import { GraphExecutor } from '../graph/executor';
+import { HistoryManager } from '../graph/history';
+import { VectorGraphModel } from '../graph/vector-graph';
+import { createDefaultRegistry } from '../nodes/register-all';
 import { PathBuilder } from '../path/builder';
 import type { SceneItem } from '../types';
 import { IDENTITY_TRANSFORM } from '../types';
+import { reverseSync } from './reverse-sync';
 import { computeSemanticDiff } from './semantic-diff';
 
 const makeItem = (id: string, path: ReturnType<PathBuilder['build']>, fill?: string): SceneItem => ({
@@ -86,12 +92,12 @@ describe('computeSemanticDiff', () => {
     // rect matched with style change
     const rectMatch = diff.matched.find((m) => m.currentId === 'n1');
     expect(rectMatch).toBeDefined();
-    expect(rectMatch!.styleChanged).toBe(true);
+    expect(rectMatch?.styleChanged).toBe(true);
 
     // tri matched without style change
     const triMatch = diff.matched.find((m) => m.currentId === 'n2');
     expect(triMatch).toBeDefined();
-    expect(triMatch!.styleChanged).toBe(false);
+    expect(triMatch?.styleChanged).toBe(false);
   });
 
   it('should not flag ambiguous when all shapes match', () => {
@@ -112,5 +118,91 @@ describe('computeSemanticDiff', () => {
     expect(diff.matched[0].geometryChanged).toBe(true);
     expect(diff.added.length).toBe(0);
     expect(diff.removed.length).toBe(0);
+  });
+});
+
+describe('reverseSync', () => {
+  it('should detect no changes for identical SVG', () => {
+    const registry = createDefaultRegistry();
+    const graph = VectorGraphModel.create('test', 'RS', 100, 100);
+    graph.addNode({ type: 'rectangle', params: { width: 50, height: 50, x: 0, y: 0 } });
+    const executor = new GraphExecutor(registry);
+    const history = new HistoryManager();
+    const svg = sceneToSvg(executor.execute(graph).scene);
+    const result = reverseSync(graph, executor, registry, history, svg);
+    expect(result.changesApplied).toBe(0);
+  });
+
+  it('should handle empty incoming SVG', () => {
+    const registry = createDefaultRegistry();
+    const graph = VectorGraphModel.create('test', 'RS', 100, 100);
+    const executor = new GraphExecutor(registry);
+    const history = new HistoryManager();
+    const result = reverseSync(graph, executor, registry, history, '<svg viewBox="0 0 100 100"></svg>');
+    expect(result.ambiguous).toBe(false);
+  });
+
+  it('should detect added shape in incoming SVG', () => {
+    const registry = createDefaultRegistry();
+    const graph = VectorGraphModel.create('test', 'RS', 100, 100);
+    const executor = new GraphExecutor(registry);
+    const history = new HistoryManager();
+    // Incoming SVG has a shape but graph is empty
+    const svg = '<svg viewBox="0 0 100 100"><rect width="50" height="50" fill="#ff0000"/></svg>';
+    const result = reverseSync(graph, executor, registry, history, svg);
+    expect(result.addedShapes).toBeGreaterThanOrEqual(1);
+  });
+
+  it('should apply style change when fill color differs', () => {
+    const registry = createDefaultRegistry();
+    const graph = VectorGraphModel.create('test', 'RS', 100, 100);
+    // Create rectangle → fill chain
+    const rectId = graph.addNode({ type: 'rectangle', params: { width: 50, height: 50, x: 0, y: 0 } });
+    const fillId = graph.addNode({ type: 'fill', params: { fillType: 'solid', color: '#ff0000' } });
+    graph.addEdge(rectId, 'path', fillId, 'path');
+
+    const executor = new GraphExecutor(registry);
+    const history = new HistoryManager();
+
+    // Generate SVG from current state, then modify the fill color
+    const svg = sceneToSvg(executor.execute(graph).scene);
+    const modifiedSvg = svg.replace('#ff0000', '#00ff00');
+
+    const result = reverseSync(graph, executor, registry, history, modifiedSvg);
+    expect(result.modifiedStyles).toBe(1);
+
+    // Verify the fill node param was updated
+    const fillNode = graph.getNode(fillId);
+    expect(fillNode?.params.color).toBe('#00ff00');
+  });
+
+  it('should record changes in history for undo support', () => {
+    const registry = createDefaultRegistry();
+    const graph = VectorGraphModel.create('test', 'RS', 100, 100);
+    const executor = new GraphExecutor(registry);
+    const history = new HistoryManager();
+
+    const svg = '<svg viewBox="0 0 100 100"><rect width="50" height="50" fill="#ff0000"/></svg>';
+    reverseSync(graph, executor, registry, history, svg);
+
+    // History should have entries from the sync
+    expect(history.entryCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it('should report removed shapes without deleting them', () => {
+    const registry = createDefaultRegistry();
+    const graph = VectorGraphModel.create('test', 'RS', 100, 100);
+    const rectId = graph.addNode({ type: 'rectangle', params: { width: 50, height: 50, x: 0, y: 0 } });
+    const fillId = graph.addNode({ type: 'fill', params: { fillType: 'solid', color: '#ff0000' } });
+    graph.addEdge(rectId, 'path', fillId, 'path');
+
+    const executor = new GraphExecutor(registry);
+    const history = new HistoryManager();
+
+    // Empty SVG = all current shapes are "removed"
+    const result = reverseSync(graph, executor, registry, history, '<svg viewBox="0 0 100 100"></svg>');
+    expect(result.removedShapes).toBeGreaterThanOrEqual(1);
+    // But the graph nodes should still exist
+    expect(graph.nodeCount).toBe(2);
   });
 });
