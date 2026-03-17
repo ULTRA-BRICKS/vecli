@@ -7,6 +7,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { runBatch } from '../src/batch';
+import { getHelp } from '../src/help';
 
 const args = process.argv.slice(2);
 
@@ -36,7 +37,11 @@ for (let i = 0; i < args.length; i++) {
     continue;
   }
   if (arg === '-h' || arg === '--help') {
-    printHelp();
+    const topic = args[i + 1];
+    // Only consume next arg if it doesn't look like a flag
+    const helpTopic = topic && !topic.startsWith('-') ? topic : undefined;
+    if (helpTopic) i++;
+    console.log(getHelp(helpTopic));
     process.exit(0);
   }
   if (arg === '-v' || arg === '--version') {
@@ -47,28 +52,6 @@ for (let i = 0; i < args.length; i++) {
   if (!arg.startsWith('-') && !expression) {
     expression = arg;
   }
-}
-
-function printHelp(): void {
-  console.log(`vecli — Vector Engine CLI
-
-Usage:
-  vecli                              Interactive TUI mode
-  vecli 'expression'                 Evaluate inline expression
-  vecli -e script.js                 Execute script file
-  echo 'expr' | vecli               Pipe stdin
-
-Flags:
-  -e, --exec <file>     Execute script file
-  -o, --output <file>   Output file (default: stdout)
-  --canvas <WxH>        Canvas size (default: 100x100)
-  -h, --help            Show help
-  -v, --version         Show version
-
-Examples:
-  vecli 'rect(100,50).fill("#f00").svg()'
-  vecli -e icon.js -o icon.svg
-  vecli --canvas 24x24 -e icon.js`);
 }
 
 // Detect mode
