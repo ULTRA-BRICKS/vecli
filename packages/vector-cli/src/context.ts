@@ -128,7 +128,7 @@ export function executeAndRender(ctx: EvalContext): string {
     const textElements = ctx.textAnnotations
       .map(
         (t) =>
-          `<text x="${t.x}" y="${t.y}" font-size="${t.fontSize}" font-family="${escapeHtml(t.fontFamily)}" fill="${escapeHtml(t.fill)}" text-anchor="${t.anchor}">${escapeHtml(t.text)}</text>`,
+          `<text x="${t.x}" y="${t.y}" font-size="${t.fontSize}" font-family="${escapeHtml(t.fontFamily)}" fill="${escapeHtml(t.fill)}" text-anchor="${t.anchor}" xml:space="preserve">${escapeHtml(t.text)}</text>`,
       )
       .join('');
     svg = svg.replace('</svg>', `${textElements}</svg>`);
