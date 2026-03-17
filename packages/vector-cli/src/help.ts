@@ -37,7 +37,7 @@ Quick examples:
 
 Run vecli --help <topic> for details. Topics:
   generators  style  transform  ops  boolean  deformation
-  history  files  examples  all`;
+  history  files  helpers  examples  all`;
 }
 
 const TOPICS: Record<string, string> = {
@@ -223,6 +223,31 @@ Examples:
   save()
   export("svg", "icon.svg")`,
 
+  helpers: `HELPERS — Utility functions for elegant one-liners
+
+  rainbow(i, total)              HSL rainbow color at position i of total
+  palette(count)                 Array of rainbow colors
+  hsl(h, s, l)                   HSL to hex: hsl(200, 80, 50) → "#1a8ccc"
+  lerp(a, b, t)                  Linear interpolation
+  random(min?, max?)             Seeded random number
+  setSeed(n)                     Set random seed
+  deg(degrees)                   Degrees to radians
+  pointOnCircle(cx, cy, r, deg)  Point on circle at angle
+
+  grid(cols, rows, spacing, fn)  Create grid of shapes
+    fn(x, y, index) → ChainableNode
+
+  radial(count, radius, fn)      Radial arrangement
+    fn(angle, index, x, y) → ChainableNode
+
+  repeat(n, fn)                  Repeat with index
+    fn(index, t) → ChainableNode    (t = 0..1 normalized)
+
+One-liners:
+  grid(8, 8, 25, (x,y,i) => rect(20,20).translate(x,y).fill(rainbow(i,64)))
+  radial(12, 80, (a,i,x,y) => star(5,12,6).translate(x+100,y+100).rotate(a).fill(rainbow(i,12)))
+  repeat(20, (i,t) => circle(lerp(3,15,t)).translate(i*10,50).fill(hsl(t*360,80,50)))`,
+
   examples: `EXAMPLES — Full scripts
 
 # Create an up-arrow icon
@@ -259,7 +284,13 @@ Examples:
   tree()                         // see the DAG structure
   nodes()                        // tabular node list
   set(someNode, "color", "#new")
-  save()`,
+  save()
+
+# Elegant one-liners:
+  vecli 'grid(8,8,25,(x,y,i)=>rect(20,20).translate(x,y).fill(rainbow(i,64)))'
+  vecli 'radial(12,80,(a,i,x,y)=>star(5,12,6).translate(x+100,y+100).rotate(a).fill(rainbow(i,12)))'
+  vecli 'repeat(20,(i,t)=>circle(lerp(3,15,t)).translate(i*10,50).fill(hsl(t*360,80,50)))'
+  vecli 'repeat(10,(i)=>rect(100-i*10,100-i*10).translate(i*5,i*5).fill(rainbow(i,10)))'`,
 };
 
 function allHelp(): string {
