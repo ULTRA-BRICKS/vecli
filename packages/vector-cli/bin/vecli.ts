@@ -75,20 +75,16 @@ async function main(): Promise<void> {
       code = readFileSync(execFile, 'utf-8');
     }
 
-    // Read stdin if piped
-    if (!process.stdin.isTTY) {
+    // Read stdin only if explicitly piped (not TTY) AND we need it
+    // Skip stdin read if we already have code from -e or inline expression
+    // to avoid hanging when stdin is a pipe with no data
+    if (!process.stdin.isTTY && !code) {
+      // No expression — stdin IS the code
       const chunks: Buffer[] = [];
       for await (const chunk of process.stdin) {
         chunks.push(chunk as Buffer);
       }
-      const stdinText = Buffer.concat(chunks).toString('utf-8').trimEnd();
-      if (code) {
-        // Has expression/file — stdin is input data (available as `input` global)
-        stdinData = stdinText;
-      } else {
-        // No expression — stdin IS the code
-        code = stdinText;
-      }
+      code = Buffer.concat(chunks).toString('utf-8').trimEnd();
     }
 
     try {

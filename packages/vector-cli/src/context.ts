@@ -62,7 +62,7 @@ export function createContext(width?: number, height?: number): EvalContext {
 }
 
 /** Auto-fit scene canvas to content bounding box with proportional padding */
-function autoFitCanvas(scene: SceneGraph): void {
+function autoFitCanvas(scene: SceneGraph, annotations: TextAnnotation[]): void {
   let minX = Infinity;
   let minY = Infinity;
   let maxX = -Infinity;
@@ -72,8 +72,7 @@ function autoFitCanvas(scene: SceneGraph): void {
     if (isSceneItem(item) && item.visible) {
       const b = computeBounds(item.path.commands);
       if (b.width === 0 && b.height === 0) continue;
-      // Apply transform to bounding box corners
-      const t = item.transform; // [a, b, c, d, e, f]
+      const t = item.transform;
       const corners = [
         { x: b.x, y: b.y },
         { x: b.x + b.width, y: b.y },
@@ -89,6 +88,17 @@ function autoFitCanvas(scene: SceneGraph): void {
         if (ty > maxY) maxY = ty;
       }
     }
+  }
+
+  // Include text annotations in bounds
+  for (const t of annotations) {
+    const estimatedWidth = t.text.length * t.fontSize * 0.6;
+    const x = t.anchor === 'middle' ? t.x - estimatedWidth / 2 : t.x;
+    const y = t.y - t.fontSize;
+    if (x < minX) minX = x;
+    if (y < minY) minY = y;
+    if (x + estimatedWidth > maxX) maxX = x + estimatedWidth;
+    if (t.y > maxY) maxY = t.y;
   }
 
   if (minX === Infinity) return; // no visible items
@@ -111,7 +121,7 @@ function escapeHtml(s: string): string {
 export function executeAndRender(ctx: EvalContext): string {
   const result = ctx.executor.execute(ctx.graph);
   if (!ctx.canvasExplicit) {
-    autoFitCanvas(result.scene);
+    autoFitCanvas(result.scene, ctx.textAnnotations);
   }
   let svg = sceneToSvg(result.scene);
   if (ctx.textAnnotations.length > 0) {
