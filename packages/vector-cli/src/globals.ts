@@ -10,6 +10,7 @@ import { openFile, saveFile } from './commands/file';
 import type { EvalContext } from './context';
 import { formatEdgesTable, formatNodesTable } from './formatters/table';
 import { formatDAGTree } from './formatters/tree';
+import { createHelpers } from './helpers';
 import { PreviewManager } from './preview';
 
 // -- Generators --
@@ -266,12 +267,49 @@ export interface GlobalBindings {
   open: ReturnType<typeof createFileOps>['open'];
   save: ReturnType<typeof createFileOps>['save'];
   preview: ReturnType<typeof createFileOps>['preview'];
+  // Helpers
+  rainbow: (index: number, total: number) => string;
+  palette: (count: number, saturation?: number, lightness?: number) => string[];
+  hsl: (h: number, s: number, l: number) => string;
+  lerp: (a: number, b: number, t: number) => number;
+  random: (min?: number, max?: number) => number;
+  setSeed: (s: number) => void;
+  deg: (degrees: number) => number;
+  pointOnCircle: (cx: number, cy: number, radius: number, angleDeg: number) => { x: number; y: number };
+  grid: (
+    cols: number,
+    rows: number,
+    spacing: number,
+    fn: (x: number, y: number, i: number) => ChainableNode,
+  ) => ChainableNode[];
+  radial: (
+    count: number,
+    radius: number,
+    fn: (angle: number, i: number, x: number, y: number) => ChainableNode,
+    cx?: number,
+    cy?: number,
+  ) => ChainableNode[];
+  repeat: (n: number, fn: (i: number, t: number) => ChainableNode) => ChainableNode[];
   // Passthrough
   Math: typeof Math;
   console: typeof console;
 }
 
 export function createGlobals(ctx: EvalContext): GlobalBindings {
+  const helpers = createHelpers(ctx) as Pick<
+    GlobalBindings,
+    | 'rainbow'
+    | 'palette'
+    | 'hsl'
+    | 'lerp'
+    | 'random'
+    | 'setSeed'
+    | 'deg'
+    | 'pointOnCircle'
+    | 'grid'
+    | 'radial'
+    | 'repeat'
+  >;
   return {
     ...createGenerators(ctx),
     ...createMultiNodeOps(ctx),
@@ -280,6 +318,7 @@ export function createGlobals(ctx: EvalContext): GlobalBindings {
     ...createDagOps(ctx),
     ...createInspectionOps(ctx),
     ...createFileOps(ctx),
+    ...helpers,
     Math,
     console,
   };
