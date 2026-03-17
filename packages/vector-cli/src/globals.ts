@@ -6,7 +6,11 @@
  */
 
 import { ChainableNode } from './chainable';
+import { openFile, saveFile } from './commands/file';
 import type { EvalContext } from './context';
+import { formatEdgesTable, formatNodesTable } from './formatters/table';
+import { formatDAGTree } from './formatters/tree';
+import { PreviewManager } from './preview';
 
 // -- Generators --
 
@@ -164,15 +168,52 @@ function createDagOps(ctx: EvalContext) {
   };
 }
 
+// -- File I/O and Preview --
+
+function createFileOps(ctx: EvalContext) {
+  let previewManager: PreviewManager | undefined;
+
+  return {
+    open(filePath: string) {
+      openFile(ctx, filePath);
+    },
+    save(filePath?: string) {
+      saveFile(ctx, filePath);
+    },
+    preview(pathOrFalse?: string | false) {
+      if (pathOrFalse === false) {
+        previewManager?.dispose();
+        previewManager = undefined;
+        ctx.previewPath = undefined;
+        return undefined;
+      }
+      if (typeof pathOrFalse === 'string') {
+        previewManager?.dispose();
+        previewManager = new PreviewManager(pathOrFalse);
+        ctx.previewPath = pathOrFalse;
+      }
+      return ctx.previewPath;
+    },
+  };
+}
+
 // -- Inspection --
 
 function createInspectionOps(ctx: EvalContext) {
   return {
     nodes() {
-      return ctx.graph.topologicalOrder().map((id) => ctx.graph.getNode(id));
+      console.log(formatNodesTable(ctx));
+      return ctx.graph
+        .topologicalOrder()
+        .map((id) => ctx.graph.getNode(id))
+        .filter(Boolean);
     },
     edges() {
+      console.log(formatEdgesTable(ctx));
       return ctx.graph.getEdges();
+    },
+    tree() {
+      console.log(formatDAGTree(ctx));
     },
     info(node: ChainableNode) {
       return ctx.graph.getNode(node.nodeId);
@@ -219,7 +260,12 @@ export interface GlobalBindings {
   // Inspection
   nodes: ReturnType<typeof createInspectionOps>['nodes'];
   edges: ReturnType<typeof createInspectionOps>['edges'];
+  tree: ReturnType<typeof createInspectionOps>['tree'];
   info: ReturnType<typeof createInspectionOps>['info'];
+  // File I/O and Preview
+  open: ReturnType<typeof createFileOps>['open'];
+  save: ReturnType<typeof createFileOps>['save'];
+  preview: ReturnType<typeof createFileOps>['preview'];
   // Passthrough
   Math: typeof Math;
   console: typeof console;
@@ -233,6 +279,7 @@ export function createGlobals(ctx: EvalContext): GlobalBindings {
     ...createHistoryOps(ctx),
     ...createDagOps(ctx),
     ...createInspectionOps(ctx),
+    ...createFileOps(ctx),
     Math,
     console,
   };
