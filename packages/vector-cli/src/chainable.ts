@@ -20,12 +20,17 @@ import type { EvalContext } from './context';
 export class ChainableNode {
   private constructor(
     private readonly ctx: EvalContext,
-    private readonly nodeId: string,
+    readonly nodeId: string,
   ) {}
 
   /** Create a generator node (entry point for a chain). */
   static generator(ctx: EvalContext, type: string, params: Record<string, unknown>): ChainableNode {
     const nodeId = ctx.graph.addNode({ type, params });
+    return new ChainableNode(ctx, nodeId);
+  }
+
+  /** Wrap an already-existing node id (for multi-node ops like boolean, group). */
+  static fromExisting(ctx: EvalContext, nodeId: string): ChainableNode {
     return new ChainableNode(ctx, nodeId);
   }
 
