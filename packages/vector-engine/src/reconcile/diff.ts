@@ -75,8 +75,8 @@ export function computeReconciliationDiff(current: VectorGraphState, modified: V
     if (!currentEdgeMap.has(id)) {
       diff.added.edges.push(edge);
     } else {
-      const old = currentEdgeMap.get(id)!;
-      if (old.source !== edge.source || old.target !== edge.target) {
+      const old = currentEdgeMap.get(id);
+      if (old && (old.source !== edge.source || old.target !== edge.target)) {
         diff.modified.reordered.push({
           edgeId: id,
           old: { source: old.source, target: old.target },

@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'bun:test';
+import { HistoryManager } from '../graph/history';
+import { VectorGraphModel } from '../graph/vector-graph';
 import type { VectorGraphState } from '../persistence/types';
+import { applyReconciliation } from './apply';
+import type { ReconciliationDiff } from './diff';
 import { computeReconciliationDiff } from './diff';
 
 const makeState = (overrides?: Partial<VectorGraphState>): VectorGraphState => ({
@@ -91,5 +95,82 @@ describe('computeReconciliationDiff', () => {
     expect(diff.removed.nodeIds.length).toBe(0);
     expect(diff.modified.params.length).toBe(0);
     expect(diff.meta.canvasChanged).toBe(false);
+  });
+});
+
+describe('applyReconciliation', () => {
+  it('should add nodes from diff', () => {
+    const graph = VectorGraphModel.create('test', 'Test', 100, 100);
+    const history = new HistoryManager();
+    const diff: ReconciliationDiff = {
+      added: { nodes: [{ id: 'new-1', type: 'ellipse', params: { rx: 25, ry: 25 } }], edges: [] },
+      removed: { nodeIds: [], edgeIds: [] },
+      modified: { params: [], reordered: [], muted: { added: [], removed: [] } },
+      meta: { canvasChanged: false, viewportChanged: false },
+    };
+    applyReconciliation(graph, history, diff);
+    expect(graph.nodeCount).toBe(1);
+    expect(graph.getNode('new-1')).toBeDefined();
+  });
+
+  it('should remove nodes from diff', () => {
+    const graph = VectorGraphModel.create('test', 'Test', 100, 100);
+    const history = new HistoryManager();
+    const nodeId = graph.addNode({ type: 'rectangle', params: {} });
+    const diff: ReconciliationDiff = {
+      added: { nodes: [], edges: [] },
+      removed: { nodeIds: [nodeId], edgeIds: [] },
+      modified: { params: [], reordered: [], muted: { added: [], removed: [] } },
+      meta: { canvasChanged: false, viewportChanged: false },
+    };
+    applyReconciliation(graph, history, diff);
+    expect(graph.nodeCount).toBe(0);
+  });
+
+  it('should apply param changes', () => {
+    const graph = VectorGraphModel.create('test', 'Test', 100, 100);
+    const history = new HistoryManager();
+    const nodeId = graph.addNode({ type: 'rectangle', params: { width: 50 } });
+    const diff: ReconciliationDiff = {
+      added: { nodes: [], edges: [] },
+      removed: { nodeIds: [], edgeIds: [] },
+      modified: {
+        params: [{ nodeId, changes: { width: { old: 50, new: 100 } } }],
+        reordered: [],
+        muted: { added: [], removed: [] },
+      },
+      meta: { canvasChanged: false, viewportChanged: false },
+    };
+    applyReconciliation(graph, history, diff);
+    expect(graph.getNode(nodeId)?.params.width).toBe(100);
+  });
+
+  it('should record reconciliation as undoable', () => {
+    const graph = VectorGraphModel.create('test', 'Test', 100, 100);
+    const history = new HistoryManager();
+    const diff: ReconciliationDiff = {
+      added: { nodes: [{ id: 'n1', type: 'rectangle', params: {} }], edges: [] },
+      removed: { nodeIds: [], edgeIds: [] },
+      modified: { params: [], reordered: [], muted: { added: [], removed: [] } },
+      meta: { canvasChanged: false, viewportChanged: false },
+    };
+    applyReconciliation(graph, history, diff);
+    expect(graph.nodeCount).toBe(1);
+    history.undo(graph);
+    expect(graph.nodeCount).toBe(0);
+  });
+
+  it('should handle empty diff without recording history', () => {
+    const graph = VectorGraphModel.create('test', 'Test', 100, 100);
+    const history = new HistoryManager();
+    const diff: ReconciliationDiff = {
+      added: { nodes: [], edges: [] },
+      removed: { nodeIds: [], edgeIds: [] },
+      modified: { params: [], reordered: [], muted: { added: [], removed: [] } },
+      meta: { canvasChanged: false, viewportChanged: false },
+    };
+    applyReconciliation(graph, history, diff);
+    expect(graph.nodeCount).toBe(0);
+    expect(history.entryCount).toBe(0);
   });
 });
