@@ -81,6 +81,18 @@ describe('help system', () => {
     expect(help).toContain('.fig');
   });
 
+  it('should return wordart help', () => {
+    const help = getHelp('wordart');
+    expect(help).toContain('arcText(');
+    expect(help).toContain('wavyText(');
+    expect(help).toContain('ribbon(');
+    expect(help).toContain('badge(');
+    expect(help).toContain('burst(');
+    expect(help).toContain('spiralPath(');
+    expect(help).toContain('bubble(');
+    expect(help).toContain('input');
+  });
+
   it('should return examples help', () => {
     const help = getHelp('examples');
     expect(help).toContain('canvas(');
@@ -94,6 +106,7 @@ describe('help system', () => {
     expect(help).toContain('STYLE');
     expect(help).toContain('BOOLEAN');
     expect(help).toContain('HISTORY');
+    expect(help).toContain('WORD ART');
     expect(help).toContain('EXAMPLES');
   });
 

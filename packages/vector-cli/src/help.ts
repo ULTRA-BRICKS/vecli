@@ -25,6 +25,7 @@ Usage:
 Flags:
   -e, --exec <file>     Execute script file
   -o, --output <file>   Output file (default: stdout)
+  --format <svg|png>    Output format (default: svg, png needs rsvg-convert)
   --canvas <WxH>        Canvas size (default: 100x100)
   --preview <file>      Live SVG preview file
   -h, --help [topic]    Show help (optionally for a topic)
@@ -37,7 +38,7 @@ Quick examples:
 
 Run vecli --help <topic> for details. Topics:
   generators  style  transform  ops  boolean  deformation
-  history  files  helpers  examples  all`;
+  history  files  helpers  wordart  examples  all`;
 }
 
 const TOPICS: Record<string, string> = {
@@ -247,6 +248,35 @@ One-liners:
   grid(8, 8, 25, (x,y,i) => rect(20,20).translate(x,y).fill(rainbow(i,64)))
   radial(12, 80, (a,i,x,y) => star(5,12,6).translate(x+100,y+100).rotate(a).fill(rainbow(i,12)))
   repeat(20, (i,t) => circle(lerp(3,15,t)).translate(i*10,50).fill(hsl(t*360,80,50)))`,
+
+  wordart: `WORD ART & DECORATIVE HELPERS
+
+  arcText(str, radius, start?, spread?, size?)   Text along arc
+  wavyText(str, amplitude?, frequency?, size?)    Wavy text
+  ribbon(w, h, curvature?)                        Curved banner
+  badge(w, h, notchSize?)                         Octagonal badge
+  burst(rays, outerR, innerR)                     Starburst shape
+  spiralPath(turns, maxR, points?)                Spiral path
+  bubble(w, h, tailX?, tailY?)                    Speech bubble
+  heart(size?)                                    Heart shape (cubic bezier)
+  cowsay(message, fontSize?)                      Speech bubble with ASCII cow
+  label(str, x, y, opts?)                         SVG text annotation (no font needed)
+
+  .png(filename?, width?)                         Export as PNG (needs rsvg-convert)
+
+  input                           Stdin data (from pipe)
+
+Note: arcText/wavyText use text() which requires a loaded font for path outlines.
+      label/cowsay use SVG text elements — no font loading needed.
+
+Usage:
+  echo "Hello" | vecli 'text(input, 48).fill("#f00")'
+  vecli 'burst(16, 50, 25).fill("#ff0")'
+  vecli 'ribbon(120, 30, 15).fill("#e74c3c")'
+  vecli 'bubble(150, 80).fill("#fff").stroke("#333", 2)'
+  vecli 'heart(60).fill("#e74c3c")'
+  vecli 'cowsay("Moo!").fill("#fff").stroke("#333", 1.5)'
+  vecli --format png 'circle(50).fill("#f00")' > out.png`,
 
   examples: `EXAMPLES — Full scripts
 

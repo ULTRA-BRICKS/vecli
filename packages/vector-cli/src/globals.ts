@@ -10,7 +10,7 @@ import { openFile, saveFile } from './commands/file';
 import type { EvalContext } from './context';
 import { formatEdgesTable, formatNodesTable } from './formatters/table';
 import { formatDAGTree } from './formatters/tree';
-import { createHelpers } from './helpers';
+import { createHelpers, createWordArtHelpers } from './helpers';
 import { PreviewManager } from './preview';
 
 // -- Generators --
@@ -113,6 +113,7 @@ function createCanvasOps(ctx: EvalContext) {
       if (w !== undefined && h !== undefined) {
         ctx.canvasWidth = w;
         ctx.canvasHeight = h;
+        ctx.canvasExplicit = true;
       }
       return { width: ctx.canvasWidth, height: ctx.canvasHeight };
     },
@@ -290,6 +291,26 @@ export interface GlobalBindings {
     cy?: number,
   ) => ChainableNode[];
   repeat: (n: number, fn: (i: number, t: number) => ChainableNode) => ChainableNode[];
+  // Word art
+  arcText: (str: string, radius: number, startAngle?: number, spread?: number, fontSize?: number) => ChainableNode[];
+  wavyText: (str: string, amplitude?: number, frequency?: number, fontSize?: number) => ChainableNode[];
+  ribbon: (width: number, height: number, notch?: number) => ChainableNode;
+  badge: (width: number, height: number, notchSize?: number) => ChainableNode;
+  burst: (rays: number, outerR: number, innerR: number) => ChainableNode;
+  spiralPath: (turns: number, maxRadius: number, points?: number) => ChainableNode;
+  bubble: ((...args: unknown[]) => ChainableNode) &
+    ((width: number, height: number, tailX?: number, tailY?: number) => ChainableNode) &
+    ((text: string, width: number, height: number, tailX?: number, tailY?: number) => ChainableNode);
+  heart: (size?: number) => ChainableNode;
+  cowsay: (message: string, fontSize?: number) => ChainableNode;
+  label: (
+    str: string,
+    x: number,
+    y: number,
+    opts?: { size?: number; fill?: string; font?: string; anchor?: string },
+  ) => void;
+  // Stdin
+  input: string;
   // Passthrough
   Math: typeof Math;
   console: typeof console;
@@ -310,8 +331,13 @@ export function createGlobals(ctx: EvalContext): GlobalBindings {
     | 'radial'
     | 'repeat'
   >;
+  const generators = createGenerators(ctx);
+  const wordArt = createWordArtHelpers(ctx, generators.text) as Pick<
+    GlobalBindings,
+    'arcText' | 'wavyText' | 'ribbon' | 'badge' | 'burst' | 'spiralPath' | 'bubble' | 'heart' | 'cowsay' | 'label'
+  >;
   return {
-    ...createGenerators(ctx),
+    ...generators,
     ...createMultiNodeOps(ctx),
     ...createCanvasOps(ctx),
     ...createHistoryOps(ctx),
@@ -319,6 +345,8 @@ export function createGlobals(ctx: EvalContext): GlobalBindings {
     ...createInspectionOps(ctx),
     ...createFileOps(ctx),
     ...helpers,
+    ...wordArt,
+    input: ctx.stdinData ?? '',
     Math,
     console,
   };
