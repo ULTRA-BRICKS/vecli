@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'bun:test';
 import { computeBounds } from './bounds';
 import { PathBuilder } from './builder';
+import { encodeCommands, PathCmd } from './commands';
 
 describe('computeBounds', () => {
   it('should compute bounds for a rectangle', () => {
@@ -22,18 +23,25 @@ describe('computeBounds', () => {
     expect(bounds).toEqual({ x: 0, y: 0, width: 0, height: 0 });
   });
 
-  it('should include control points in bounds for cubic curves', () => {
+  it('should compute tight bounds for cubic curves', () => {
     const path = new PathBuilder().moveTo(0, 0).cubicTo(50, -100, 150, 200, 100, 0).build();
     const bounds = computeBounds(path.commands);
-    // Control points extend to y=-100 and y=200
-    expect(bounds.y).toBeLessThanOrEqual(-100);
-    expect(bounds.height).toBeGreaterThanOrEqual(300);
+    // Tight bounds: derivative root solving yields extrema well inside the control-point hull.
+    // Curve extends below y=0 but nowhere near the control point at y=-100.
+    expect(bounds.y).toBeLessThan(0);
+    expect(bounds.y).toBeGreaterThan(-100);
+    expect(bounds.y + bounds.height).toBeGreaterThan(0);
+    expect(bounds.y + bounds.height).toBeLessThan(200);
+    // Endpoints must be included
+    expect(bounds.x).toBeLessThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeGreaterThanOrEqual(100);
   });
 
-  it('should include control point in bounds for quadratic curves', () => {
+  it('should compute tight bounds for quadratic curves', () => {
     const path = new PathBuilder().moveTo(0, 0).quadTo(50, -50, 100, 0).build();
     const bounds = computeBounds(path.commands);
-    expect(bounds.y).toBeLessThanOrEqual(-50);
+    // Tight quad bound: extremum at t=0.5 gives y = 2*0.5*0.5*(-50) = -25, not -50.
+    expect(bounds.y).toBeCloseTo(-25, 1);
   });
 
   it('should handle arc commands', () => {
@@ -52,12 +60,15 @@ describe('computeBounds', () => {
       .close()
       .build();
     const bounds = computeBounds(path.commands);
-    // Must reach at least as far as the control points of the cubic (x=300, y=-50)
-    // and the quadratic (y=200)
+    // Tight bounds: must cover all endpoints and actual curve extrema.
+    // The cubic from (200,10) to (200,100) with cp=(250,-50),(300,150) yields
+    // tight y slightly below 10, but not as far as the hull at -50.
+    // The quadratic from (200,100) to (50,150) with cp=(100,200) has extremum
+    // at t=0.5, well inside the hull — bounds reach y > 150 but < 200.
     expect(bounds.x).toBeLessThanOrEqual(10);
-    expect(bounds.y).toBeLessThanOrEqual(-50);
-    expect(bounds.x + bounds.width).toBeGreaterThanOrEqual(300);
-    expect(bounds.y + bounds.height).toBeGreaterThanOrEqual(200);
+    expect(bounds.y).toBeLessThan(10);
+    expect(bounds.x + bounds.width).toBeGreaterThanOrEqual(200);
+    expect(bounds.y + bounds.height).toBeGreaterThanOrEqual(150);
   });
 
   it('degenerate single point (M only) — bounds should be zero-sized at that point', () => {
@@ -81,14 +92,113 @@ describe('computeBounds', () => {
     expect(bounds.height).toBe(100);
   });
 
-  it('large cubic with control points far from endpoints — control points must be included', () => {
-    // Endpoints are at (0,0) and (100,0), but control points reach (50,-500) and (50,500)
+  it('large S-curve cubic — tight bounds extend well beyond endpoints but not to control points', () => {
+    // Endpoints are at (0,0) and (100,0), control points at (50,-500) and (50,500).
+    // Tight bounds: derivative roots at t≈0.211 and t≈0.789, yielding y ≈ ±144.
     const path = new PathBuilder().moveTo(0, 0).cubicTo(50, -500, 50, 500, 100, 0).build();
     const bounds = computeBounds(path.commands);
-    expect(bounds.y).toBeLessThanOrEqual(-500);
-    expect(bounds.y + bounds.height).toBeGreaterThanOrEqual(500);
-    // x range should at least cover endpoints
+    // Tight bounds extend significantly but not to the hull's ±500
+    expect(bounds.y).toBeLessThan(-100);
+    expect(bounds.y).toBeGreaterThan(-500);
+    expect(bounds.y + bounds.height).toBeGreaterThan(100);
+    expect(bounds.y + bounds.height).toBeLessThan(500);
+    // x range must cover endpoints
     expect(bounds.x).toBeLessThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeGreaterThanOrEqual(100);
+  });
+
+  it('should compute tight bounds for semicircular arc', () => {
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Arc, rx: 50, ry: 50, rotation: 0, largeArc: 0, sweep: 1, x: 100, y: 0 },
+    ]);
+    const bounds = computeBounds(cmds);
+    expect(bounds.x).toBeCloseTo(0, 1);
+    expect(bounds.y).toBeCloseTo(-50, 1);
+    expect(bounds.width).toBeCloseTo(100, 1);
+    expect(bounds.height).toBeCloseTo(50, 1);
+  });
+
+  it('arc after Close uses subpath start as start point', () => {
+    // M 0 0 L 10 0 Z A 50 50 0 0 1 100 0
+    // After Z, current point resets to subpath start (0,0), not (10,0).
+    // Arc from (0,0) to (100,0) with sweep=1 is a semicircle reaching y=-50.
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Line, x: 10, y: 0 },
+      { type: PathCmd.Close },
+      { type: PathCmd.Arc, rx: 50, ry: 50, rotation: 0, largeArc: 0, sweep: 1, x: 100, y: 0 },
+    ]);
+    const bounds = computeBounds(cmds);
+    expect(bounds.y).toBeCloseTo(-50, 1);
+    expect(bounds.width).toBeCloseTo(100, 1);
+  });
+
+  it('should handle large-arc flag correctly', () => {
+    // start=(0,0), end=(60,0), r=50: two valid centers at (30,40) and (30,-40).
+    // largeArc=1, sweep=1: selects center (30,-40), sweeping ~286° CW.
+    // Arc passes through the topmost point of that circle at (30,-90).
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Arc, rx: 50, ry: 50, rotation: 0, largeArc: 1, sweep: 1, x: 60, y: 0 },
+    ]);
+    const bounds = computeBounds(cmds);
+    // The arc reaches the topmost point (30, -90) on the circle
+    expect(bounds.y).toBeCloseTo(-90, 0);
+    expect(bounds.width).toBeGreaterThanOrEqual(60);
+  });
+});
+
+describe('tight cubic bounds', () => {
+  it('should compute tight bounds for cubic with distant control point', () => {
+    // Cubic from (0,0) to (100,0) with cp1=(50,200) cp2=(50,-200)
+    // Control-point hull gives y:[-200, 200] height=400
+    // Tight bounds should be much smaller
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Cubic, cx1: 50, cy1: 200, cx2: 50, cy2: -200, x: 100, y: 0 },
+    ]);
+    const bounds = computeBounds(cmds);
+    expect(bounds.height).toBeLessThan(200); // Much less than 400 (hull)
+  });
+
+  it('should still include endpoints', () => {
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 10, y: 20 },
+      { type: PathCmd.Cubic, cx1: 50, cy1: 50, cx2: 80, cy2: 50, x: 90, y: 30 },
+    ]);
+    const bounds = computeBounds(cmds);
+    expect(bounds.x).toBeLessThanOrEqual(10);
+    expect(bounds.y).toBeLessThanOrEqual(20);
+    expect(bounds.x + bounds.width).toBeGreaterThanOrEqual(90);
+    expect(bounds.y + bounds.height).toBeGreaterThanOrEqual(30);
+  });
+
+  it('should handle S-curve correctly', () => {
+    // S-curve: control points on opposite sides
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 50 },
+      { type: PathCmd.Cubic, cx1: 33, cy1: 0, cx2: 66, cy2: 100, x: 100, y: 50 },
+    ]);
+    const bounds = computeBounds(cmds);
+    // Should extend beyond y=0 and y=100 slightly but not hugely
+    expect(bounds.y).toBeLessThan(50);
+    expect(bounds.y + bounds.height).toBeGreaterThan(50);
+  });
+});
+
+describe('tight quad bounds', () => {
+  it('should compute tight bounds for quad with distant control point', () => {
+    const cmds = encodeCommands([
+      { type: PathCmd.Move, x: 0, y: 0 },
+      { type: PathCmd.Quad, cx: 50, cy: 200, x: 100, y: 0 },
+    ]);
+    const bounds = computeBounds(cmds);
+    // Tight quad bounds: extremum at t = (P0-P1)/(P0-2P1+P2) for y
+    // P0=0, P1=200, P2=0 → t = (0-200)/(0-400+0) = 0.5
+    // B(0.5) = 0.25*0 + 2*0.5*0.5*200 + 0.25*0 = 100
+    // So height should be 100, not 200
+    expect(bounds.height).toBeLessThanOrEqual(101); // Allow small tolerance
+    expect(bounds.height).toBeGreaterThan(90);
   });
 });

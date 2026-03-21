@@ -19,4 +19,6 @@ export interface PathOpsBackend {
     join: 'miter' | 'round' | 'bevel',
   ): PathValue;
   dash(path: PathValue, dashArray: number[], dashOffset: number): PathValue;
+  offset(path: PathValue, distance: number): PathValue;
+  removeSelfIntersections(path: PathValue): PathValue;
 }

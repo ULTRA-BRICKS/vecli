@@ -29,7 +29,7 @@ interface CacheEntry {
 const EMPTY_STYLE: StyleValue = {};
 
 /** Ports auto-forwarded from upstream nodes without requiring explicit edges */
-const IMPLICIT_PORTS = ['transform', 'clipPath'] as const;
+const IMPLICIT_PORTS = ['style', 'transform', 'clipPath'] as const;
 
 /**
  * Compute a cache fingerprint for a node value.
@@ -122,13 +122,21 @@ export class GraphExecutor {
       }
 
       if (isMuted) {
-        // Passthrough: forward first input port value to first output port
         const outputs: Record<string, NodeValue | NodeValue[]> = {};
         if (typeDef && typeDef.inputs.length > 0 && typeDef.outputs.length > 0) {
-          const firstIn = typeDef.inputs[0].name;
-          const firstOut = typeDef.outputs[0].name;
-          const val = resolvedInputs[firstIn];
-          if (val !== undefined) outputs[firstOut] = val;
+          const firstInDef = typeDef.inputs[0];
+          const firstOutDef = typeDef.outputs[0];
+          // Only pass through if types match (spec: mute semantics)
+          if (firstInDef.type === firstOutDef.type) {
+            const val = resolvedInputs[firstInDef.name];
+            if (val !== undefined) outputs[firstOutDef.name] = val;
+          }
+        }
+        // Forward implicit ports even when muted (transform cascade)
+        for (const portName of IMPLICIT_PORTS) {
+          if (resolvedInputs[portName] !== undefined) {
+            outputs[portName] = resolvedInputs[portName];
+          }
         }
         nodeOutputs.set(nodeId, outputs);
         nodeStatus[nodeId] = { state: 'skipped' };
