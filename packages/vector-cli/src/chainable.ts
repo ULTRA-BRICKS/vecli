@@ -135,6 +135,26 @@ export class ChainableNode {
     return this.chain('strokeToPath', { width, cap: 'butt', join: 'miter' });
   }
 
+  /**
+   * Lay real glyph outlines of `text` along this path, following its tangent.
+   *
+   * Consumes the current node as the baseline curve and produces a compound path
+   * of per-glyph outlines (true text-on-path, not positioned <text> annotations).
+   * Requires a font registered in the engine; with no font the result is empty.
+   */
+  textOnPath(
+    text: string,
+    opts: { fontSize?: number; fontUrl?: string; letterSpacing?: number; startOffset?: number } = {},
+  ): ChainableNode {
+    return this.chain('textOnPath', {
+      text,
+      fontSize: opts.fontSize ?? 48,
+      fontUrl: opts.fontUrl ?? '',
+      letterSpacing: opts.letterSpacing ?? 0,
+      startOffset: opts.startOffset ?? 0,
+    });
+  }
+
   // -- Deformations --
 
   roughen(size: number, detail = 5): ChainableNode {

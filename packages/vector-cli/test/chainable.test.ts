@@ -76,6 +76,21 @@ describe('ChainableNode', () => {
     expect(ctx.graph.nodeCount).toBe(4);
   });
 
+  it('should chain textOnPath, wiring the path output into the new node', () => {
+    const ctx = createContext();
+    const node = ChainableNode.generator(ctx, 'line', { x1: 0, y1: 0, x2: 200, y2: 0 }).textOnPath('Hi', {
+      fontUrl: 'mock://f.ttf',
+      fontSize: 32,
+    });
+    expect(ctx.graph.nodeCount).toBe(2);
+    expect(ctx.graph.edgeCount).toBe(1);
+    const created = ctx.graph.getNode(node.nodeId);
+    expect(created?.type).toBe('textOnPath');
+    expect(created?.params.text).toBe('Hi');
+    expect(created?.params.fontUrl).toBe('mock://f.ttf');
+    expect(created?.params.fontSize).toBe(32);
+  });
+
   it('should return area', () => {
     const ctx = createContext();
     const area = ChainableNode.generator(ctx, 'rectangle', { width: 100, height: 100, x: 0, y: 0 }).area();
