@@ -59,6 +59,17 @@ describe('ChainableNode', () => {
     expect(ctx.graph.nodeCount).toBe(2);
   });
 
+  it('executes .reverse() and .close() (node types match the registry, not Unknown)', () => {
+    // Regression for the reversePath/closeOpen vs reverse-path/close-open-path name
+    // mismatch (HYP-512): before the fix these hit "Unknown node type" in GraphExecutor.
+    const rev = ChainableNode.generator(createContext(), 'rectangle', { width: 40, height: 20 }).reverse().svg();
+    expect(rev).toContain('<svg');
+    expect(rev).toContain('<path');
+    const closed = ChainableNode.generator(createContext(), 'line', { x1: 0, y1: 0, x2: 50, y2: 0 }).close().svg();
+    expect(closed).toContain('<svg');
+    expect(closed).toContain('<path');
+  });
+
   it('should chain transforms', () => {
     const ctx = createContext();
     ChainableNode.generator(ctx, 'rectangle', { width: 50, height: 50 }).translate(10, 20).rotate(45).scale(2);

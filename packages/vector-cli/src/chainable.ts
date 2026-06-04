@@ -111,11 +111,14 @@ export class ChainableNode {
   }
 
   reverse(): ChainableNode {
-    return this.chain('reversePath', {});
+    // Node type must match the registry name (basic-ops.ts: 'reverse-path'); the old
+    // 'reversePath' hit "Unknown node type" in GraphExecutor — .reverse() was a no-op.
+    return this.chain('reverse-path', {});
   }
 
   close(): ChainableNode {
-    return this.chain('closeOpen', {});
+    // Registry name is 'close-open-path' (basic-ops.ts); the old 'closeOpen' was unknown.
+    return this.chain('close-open-path', { action: 'close' });
   }
 
   dash(dashArray: number[], dashOffset = 0): ChainableNode {
