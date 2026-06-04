@@ -98,12 +98,18 @@ export class ChainableNode {
   }
 
   /**
-   * Reduce redundant points via Ramer-Douglas-Peucker decimation, then run the WASM
-   * geometric simplify (self-intersection removal). Higher tolerance drops more points;
-   * tolerance 0 is a near-identity.
+   * Reduce redundant points, then run the WASM geometric simplify (self-intersection
+   * removal). Higher tolerance drops more points; tolerance 0 is a near-identity.
+   *
+   * `method` picks the decimation algorithm (default 'rdp'):
+   *   - 'rdp' (Ramer-Douglas-Peucker): `tolerance` is the max perpendicular distance any
+   *     dropped point may deviate from the simplified polyline (a hard deviation bound).
+   *   - 'vw' (Visvalingam-Whyatt): `tolerance` is the minimum effective triangle AREA a
+   *     vertex must have to survive. VW keeps visually salient vertices but gives no
+   *     per-point deviation bound — the threshold is an area, not a distance.
    */
-  simplify(tolerance = 1): ChainableNode {
-    return this.chain('simplify', { tolerance });
+  simplify(tolerance = 1, opts?: { method?: 'rdp' | 'vw' }): ChainableNode {
+    return this.chain('simplify', { tolerance, method: opts?.method ?? 'rdp' });
   }
 
   trim(start = 0, end = 1): ChainableNode {

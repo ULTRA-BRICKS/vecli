@@ -124,6 +124,20 @@ describe('ChainableNode', () => {
       const bounds = ChainableNode.generator(ctx, 'svgPath', { d }).simplify(0).bounds();
       expect(bounds.width).toBeCloseTo(30, 0);
     });
+
+    it("runs Visvalingam-Whyatt end-to-end via .simplify(tolerance, { method: 'vw' })", () => {
+      // Discriminator polyline: VW keeps the on-axis (10,0) vertex (large effective
+      // triangle area), RDP drops it (small perpendicular deviation). The two modes
+      // therefore yield different path lengths — proving VW actually executed and is
+      // not silently falling back to RDP. length() runs the executor end-to-end, so an
+      // unmapped node type would throw here rather than pass.
+      const d = 'M 0 0 L 5 0.1 L 10 0 L 15 10 L 20 0';
+      const rdpLen = ChainableNode.generator(createContext(), 'svgPath', { d }).simplify(6).length();
+      const vwLen = ChainableNode.generator(createContext(), 'svgPath', { d }).simplify(6, { method: 'vw' }).length();
+      // VW keeps (10,0) → longer polyline (~32.36) than RDP (~29.21).
+      expect(vwLen).toBeGreaterThan(rdpLen);
+      expect(vwLen).toBeCloseTo(32.36, 1);
+    });
   });
 
   describe('png', () => {
