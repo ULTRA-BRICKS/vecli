@@ -313,7 +313,7 @@ export function compile(source: string, host: LanguageHost): SourceResult {
           accepted.add(`$${index}`);
           if (value.tag === "literal" && typeof value.value === "number") {
             // Instance inputs are live scalar nodes, not baked constants inside the expanded geometry.
-            const field = provided ? { value: provided.value as Span } : {};
+            const field: Record<string, Span> = provided ? { value: provided.value } : {};
             child.values.set(
               key,
               add(

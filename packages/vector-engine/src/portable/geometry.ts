@@ -5,7 +5,6 @@ import { polygonNode } from "../nodes/generators/polygon";
 import { starNode } from "../nodes/generators/star";
 import { lineNode } from "../nodes/generators/line";
 import { svgPathNode } from "../nodes/generators/svg-path";
-import { PathBuilder } from "../path/builder";
 import { computeBounds } from "../path/bounds";
 import { commandsToSvgD } from "../path/commands";
 import type { NodeTypeDefinition, PathValue } from "../types";
@@ -59,7 +58,6 @@ export function generateGeometry(
     throw new Error("vecli generator vertex budget exceeded");
   if (typeof params.d === "string" && params.d.length > 100000)
     throw new Error("vecli SVG path budget exceeded");
-  let path: PathValue;
   const radius = supplied.radius;
   if (
     radius !== undefined &&
@@ -72,7 +70,7 @@ export function generateGeometry(
   const value = generator.execute({}, params).path;
   if (!value || Array.isArray(value) || value.type !== "path")
     throw new Error("vecli generator did not return path geometry");
-  path = value.value;
+  const path = value.value;
 
   return {
     path,
