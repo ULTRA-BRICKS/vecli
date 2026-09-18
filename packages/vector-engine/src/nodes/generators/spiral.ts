@@ -28,7 +28,7 @@ export const spiralNode: NodeTypeDefinition = {
     { name: 'cy', type: 'number', default: 0 },
   ],
   execute(_inputs, params) {
-    const { turns, startRadius, endRadius, cx, cy } = params as {
+    const { turns = 3, startRadius = 10, endRadius = 50, cx = 0, cy = 0 } = params as {
       turns: number;
       startRadius: number;
       endRadius: number;

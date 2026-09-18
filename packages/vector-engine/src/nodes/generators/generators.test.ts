@@ -57,7 +57,7 @@ describe('Rectangle generator', () => {
   });
 
   it('should have correct params definition', () => {
-    expect(rectangleNode.params.map((p) => p.name)).toEqual(['width', 'height', 'x', 'y']);
+    expect(rectangleNode.params.map((p) => p.name)).toEqual(['width', 'height', 'x', 'y', 'radius']);
   });
 });
 

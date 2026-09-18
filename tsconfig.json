@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "bun"
+    ]
+  },
+  "include": [
+    "packages/parametric-source/src/**/*.ts",
+    "packages/vector-engine/src/portable/geometry.ts"
+  ]
+}

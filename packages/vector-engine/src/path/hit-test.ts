@@ -22,10 +22,10 @@ export function pointInPath(point: Point, path: PathValue): boolean {
 
   let inside = false;
   for (let i = 0, j = points.length - 1; i < points.length; j = i++) {
-    const xi = points[i].x;
-    const yi = points[i].y;
-    const xj = points[j].x;
-    const yj = points[j].y;
+    const xi = points[i]!.x;
+    const yi = points[i]!.y;
+    const xj = points[j]!.x;
+    const yj = points[j]!.y;
     if (yi > point.y !== yj > point.y && point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi) {
       inside = !inside;
     }
@@ -40,7 +40,7 @@ export function pointOnStroke(point: Point, path: PathValue, tolerance: number):
   const points = flattenPath(path.commands, 0.5);
   if (points.length < 2) return false;
   for (let i = 1; i < points.length; i++) {
-    const d = distToSegment(point, points[i - 1], points[i]);
+    const d = distToSegment(point, points[i - 1]!, points[i]!);
     if (d <= tolerance) return true;
   }
   return false;

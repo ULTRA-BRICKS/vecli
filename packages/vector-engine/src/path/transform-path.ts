@@ -113,7 +113,7 @@ export function transformPathCommands(commands: Float64Array, m: TransformMatrix
         ]);
         const pts = flattenPath(arcBuffer, arcFlattenTolerance);
         for (let i = 1; i < pts.length; i++) {
-          const p = pts[i];
+          const p = pts[i]!;
           out.push({ type: PathCmd.Line, x: mapX(m, p.x, p.y), y: mapY(m, p.x, p.y) });
         }
         lastX = cmd.x;

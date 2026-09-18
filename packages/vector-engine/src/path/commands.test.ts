@@ -299,17 +299,9 @@ describe('SVG parsing edge cases', () => {
     ]);
   });
 
-  it('should not parse condensed arc flags without separators — known limitation', () => {
-    // TODO: The SVG spec allows arc flag digits (0 or 1) to be written without
-    // separators: "A25 25 0 00-25 25" where the two 0s are largeArc=0 and sweep=0.
-    // The current TOKEN_RE treats "00" as the single number 0, consuming both flags
-    // as one token. The result is mis-parsed (only 6 values consumed instead of 7).
-    // Track in: HYP-308 (requires special arc tokenization).
-    //
-    // This test documents that parsing does NOT throw (no crash) but produces
-    // wrong output — serving as a regression baseline for the future fix.
-    expect(() => svgDToCommands('M0 0 A25 25 0 00-25 25')).not.toThrow();
-    // Full correct behavior once implemented:
-    //   decoded[1] = { type: PathCmd.Arc, rx: 25, ry: 25, rotation: 0, largeArc: 0, sweep: 0, x: -25, y: 25 }
+  it('parses condensed arc flags without separators and rejects invalid flags', () => {
+    const decoded=decodeCommands(svgDToCommands('M0 0 A25 25 0 00-25 25'));
+    expect(decoded[1]).toEqual({type:PathCmd.Arc,rx:25,ry:25,rotation:0,largeArc:0,sweep:0,x:-25,y:25});
+    expect(()=>svgDToCommands('M0 0 A25 25 0 2 0 4 5')).toThrow();
   });
 });

@@ -1,0 +1,21 @@
+{
+  "upstream": "git@github.com:hyperide/hyper-saas.git",
+  "upstreamCommit": "75807fee047caa632b0a3bf156530bdd4c903824",
+  "importedHead": "2fc2d8e6a6fcc4122e15d91f54d4a5176a8395f5",
+  "paths": [
+    "packages/vector-cli",
+    "packages/vector-engine",
+    "packages/vector-wasm",
+    "LICENSE",
+    "docs/specs/2026-03-17-vector-cli-design.md",
+    "docs/specs/2026-03-13-vector-engine-design.md",
+    "docs/specs/2026-06-03-vecli-vector-cli-decomposition.md",
+    "docs/specs/2026-06-03-vecli-vector-cli-decomposition.md",
+    "docs/specs/2026-06-03-vecli-pathops-gap-audit.md",
+    "docs/specs/2026-06-03-vecli-pathops-audit.md"
+  ],
+  "verifiedFiles": 217,
+  "sourceTreeHashesEqual": true,
+  "license": "Elastic-2.0 retained; no relicensing",
+  "commitCount": 110
+}

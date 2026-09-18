@@ -13,9 +13,12 @@
     "ink-text-input": "^6",
     "react": "18.3.1",
     "vector-engine": "workspace:*",
-    "vector-wasm": "workspace:*"
+    "vector-wasm": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.27.1",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "ink-testing-library": "^4"
-  }
+  },
+  "license": "Elastic-2.0"
 }

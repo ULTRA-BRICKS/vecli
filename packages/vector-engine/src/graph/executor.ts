@@ -1,3 +1,4 @@
+import type {NodeTypeDefinition} from "../types";
 /**
  * @file Graph execution engine — topological traversal with per-node caching
  *
@@ -27,6 +28,14 @@ interface CacheEntry {
 }
 
 const EMPTY_STYLE: StyleValue = {};
+const parameterDefaults=new WeakMap<NodeTypeDefinition,ReadonlyArray<readonly [string,unknown]>>();
+function withDefaults(definition:NodeTypeDefinition,params:Record<string,unknown>):Record<string,unknown>{
+ let entries=parameterDefaults.get(definition);if(!entries){entries=definition.params.map(p=>[p.name,p.default] as const);parameterDefaults.set(definition,entries);}
+ let output:Record<string,unknown>|undefined;
+ for(const [name,value] of entries){if(Object.hasOwn(params,name))continue;output??={...params};output[name]=value!==null&&typeof value==='object'?structuredClone(value):value;}
+ return output??params;
+}
+
 
 /** Ports auto-forwarded from upstream nodes without requiring explicit edges */
 const IMPLICIT_PORTS = ['style', 'transform', 'clipPath'] as const;
@@ -160,7 +169,9 @@ export class GraphExecutor {
 
           const nodeStart = performance.now();
           try {
-            const outputs = typeDef.execute(resolvedInputs, node.params);
+            // Apply declared defaults at the execution boundary for every surface, including raw graph/CLI construction.
+            const normalized = withDefaults(typeDef, node.params);
+            const outputs = typeDef.execute(resolvedInputs, normalized);
             const execMs = performance.now() - nodeStart;
             this.cache.set(nodeId, { cacheKey, outputs });
             this.dirty.delete(nodeId);
