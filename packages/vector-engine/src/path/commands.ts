@@ -100,46 +100,52 @@ export function encodeCommands(commands: PathCommand[]): Float64Array {
 export function decodeCommands(buffer: Float64Array): PathCommand[] {
   const commands: PathCommand[] = [];
   let offset = 0;
+  const read = (): number => {
+    const value=buffer[offset++];
+    if(value===undefined)throw new Error('Truncated encoded path command');
+    if(!Number.isFinite(value))throw new Error('Encoded path coordinates must be finite');
+    return value;
+  };
 
   while (offset < buffer.length) {
-    const type = buffer[offset++] as PathCmd;
+    const type = read() as PathCmd;
     switch (type) {
       case PathCmd.Move:
-        commands.push({ type, x: buffer[offset++], y: buffer[offset++] });
+        commands.push({ type, x: read(), y: read() });
         break;
       case PathCmd.Line:
-        commands.push({ type, x: buffer[offset++], y: buffer[offset++] });
+        commands.push({ type, x: read(), y: read() });
         break;
       case PathCmd.Cubic:
         commands.push({
           type,
-          cx1: buffer[offset++],
-          cy1: buffer[offset++],
-          cx2: buffer[offset++],
-          cy2: buffer[offset++],
-          x: buffer[offset++],
-          y: buffer[offset++],
+          cx1: read(),
+          cy1: read(),
+          cx2: read(),
+          cy2: read(),
+          x: read(),
+          y: read(),
         });
         break;
       case PathCmd.Quad:
         commands.push({
           type,
-          cx: buffer[offset++],
-          cy: buffer[offset++],
-          x: buffer[offset++],
-          y: buffer[offset++],
+          cx: read(),
+          cy: read(),
+          x: read(),
+          y: read(),
         });
         break;
       case PathCmd.Arc:
         commands.push({
           type,
-          rx: buffer[offset++],
-          ry: buffer[offset++],
-          rotation: buffer[offset++],
-          largeArc: buffer[offset++],
-          sweep: buffer[offset++],
-          x: buffer[offset++],
-          y: buffer[offset++],
+          rx: read(),
+          ry: read(),
+          rotation: read(),
+          largeArc: read(),
+          sweep: read(),
+          x: read(),
+          y: read(),
         });
         break;
       case PathCmd.Close:
@@ -208,20 +214,25 @@ export function commandsToSvgD(buffer: Float64Array): string {
  *  - Adjacent decimal dots:      `L1.5.5`  → ['L', '1.5', '.5']
  *  - Scientific notation:        `L1e2 3`  → ['L', '1e2', '3']
  */
-const TOKEN_RE = /([MmLlHhVvCcSsQqTtAaZz])|(-?\d*\.?\d+(?:e[+-]?\d+)?)/gi;
-
-function nextNum(tokens: string[], i: { v: number }): number {
-  return Number(tokens[i.v++]);
+const TOKEN_RE = /([MmLlHhVvCcSsQqTtAaZz])|([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)/y;
+function nextNum(tokens: string[], index: { v: number }): number {
+  const token=tokens[index.v++];
+  if(token===undefined||/^[A-Za-z]$/.test(token))throw new Error('Missing SVG path coordinate');
+  const number=Number(token);if(!Number.isFinite(number))throw new Error('SVG coordinates must be finite');return number;
 }
-
-export function svgDToCommands(d: string): Float64Array {
-  // Collect all tokens (letters and numbers)
-  const tokens: string[] = [];
-  TOKEN_RE.lastIndex = 0;
-  for (const m of d.matchAll(TOKEN_RE)) {
-    tokens.push(m[0]);
+function nextFlag(tokens:string[],index:{v:number}):number{
+ const token=tokens[index.v];if(!token||!/[01]/.test(token[0]!))throw new Error('SVG arc flag must be 0 or 1');
+ const flag=Number(token[0]);if(token.length===1)index.v++;else tokens[index.v]=token.slice(1);return flag;
+}
+export function svgDToCommands(d:string):Float64Array{
+  if(typeof d!=='string'||d.length>1048576)throw new Error('SVG source limit exceeded');
+  const tokens:string[]=[];let cursor=0;
+  while(cursor<d.length){
+    if(/[\s,]/.test(d[cursor]!)){cursor++;continue;}
+    TOKEN_RE.lastIndex=cursor;const token=TOKEN_RE.exec(d);
+    if(!token)throw new Error(`Invalid SVG path token at ${cursor}`);
+    tokens.push(token[0]);cursor=TOKEN_RE.lastIndex;if(tokens.length>250000)throw new Error('SVG token budget exceeded');
   }
-
   const commands: PathCommand[] = [];
   const idx = { v: 0 };
 
@@ -236,10 +247,11 @@ export function svgDToCommands(d: string): Float64Array {
   let currentLetter = '';
 
   while (idx.v < tokens.length) {
-    const tok = tokens[idx.v];
+    if(commands.length>=50000)throw new Error('SVG command budget exceeded');
+    const tok = tokens[idx.v]!;
 
     // If the current token is a letter, consume it as a new command
-    if (/[A-Za-z]/.test(tok)) {
+    if (/^[A-Za-z]$/.test(tok)) {
       currentLetter = tok;
       idx.v++;
     }
@@ -251,7 +263,7 @@ export function svgDToCommands(d: string): Float64Array {
       currentLetter = 'l';
     }
 
-    if (!currentLetter) continue;
+    if (!currentLetter) throw new Error('SVG path needs a command before coordinates');
 
     const upper = currentLetter.toUpperCase();
     const isRelative = currentLetter !== upper;
@@ -284,7 +296,10 @@ export function svgDToCommands(d: string): Float64Array {
       const x = ox + dx;
       const y = oy + dy;
       // Reflect last cubic control point for cx1/cy1
-      commands.push({ type: PathCmd.Cubic, cx1: lastX, cy1: lastY, cx2, cy2, x, y });
+      const previous=commands.at(-1);
+      const cx1=previous?.type===PathCmd.Cubic?2*lastX-previous.cx2:lastX;
+      const cy1=previous?.type===PathCmd.Cubic?2*lastY-previous.cy2:lastY;
+      commands.push({ type: PathCmd.Cubic, cx1, cy1, cx2, cy2, x, y });
       lastX = x;
       lastY = y;
       continue;
@@ -295,8 +310,10 @@ export function svgDToCommands(d: string): Float64Array {
       const dy = nextNum(tokens, idx);
       const x = isRelative ? lastX + dx : dx;
       const y = isRelative ? lastY + dy : dy;
-      // Simplified: use current point as control (no reflection tracking)
-      commands.push({ type: PathCmd.Quad, cx: lastX, cy: lastY, x, y });
+      const previous=commands.at(-1);
+      const cx=previous?.type===PathCmd.Quad?2*lastX-previous.cx:lastX;
+      const cy=previous?.type===PathCmd.Quad?2*lastY-previous.cy:lastY;
+      commands.push({ type: PathCmd.Quad, cx, cy, x, y });
       lastX = x;
       lastY = y;
       continue;
@@ -304,8 +321,7 @@ export function svgDToCommands(d: string): Float64Array {
 
     const type = SVG_CMD_MAP[upper];
     if (type === undefined) {
-      // Unknown command — skip to avoid infinite loop
-      continue;
+      throw new Error('Unknown SVG path command');
     }
 
     switch (type) {
@@ -364,8 +380,8 @@ export function svgDToCommands(d: string): Float64Array {
         const rx = nextNum(tokens, idx);
         const ry = nextNum(tokens, idx);
         const rotation = nextNum(tokens, idx);
-        const largeArc = nextNum(tokens, idx);
-        const sweep = nextNum(tokens, idx);
+        const largeArc = nextFlag(tokens, idx);
+        const sweep = nextFlag(tokens, idx);
         const dx = nextNum(tokens, idx);
         const dy = nextNum(tokens, idx);
         // Only the endpoint is offset for relative arcs; rx/ry/rotation/flags are absolute
@@ -381,6 +397,7 @@ export function svgDToCommands(d: string): Float64Array {
         // Reset current point to subpath start per SVG spec
         lastX = startX;
         lastY = startY;
+        currentLetter = '';
         break;
     }
   }

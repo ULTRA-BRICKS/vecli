@@ -78,7 +78,7 @@ export const arcNode: NodeTypeDefinition = {
     { name: 'cy', type: 'number', default: 0 },
   ],
   execute(_inputs, params) {
-    const { radius, startAngle, endAngle, cx, cy } = params as {
+    const { radius = 50, startAngle = 0, endAngle = 90, cx = 0, cy = 0 } = params as {
       radius: number;
       startAngle: number;
       endAngle: number;

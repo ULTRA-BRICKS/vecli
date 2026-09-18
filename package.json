@@ -1,0 +1,31 @@
+{
+  "name": "@ultrabricks/vecli",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Elastic-2.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "bin": {
+    "vecli": "packages/vector-cli/bin/vecli.ts"
+  },
+  "scripts": {
+    "test": "bun test packages",
+    "test:engine": "bun test packages/vector-engine",
+    "test:cli": "bun test packages/vector-cli",
+    "test:wasm": "bun test packages/vector-wasm",
+    "check": "bun test packages && tsc --noEmit",
+    "typecheck:portable": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/bun": "1.4.2",
+    "@types/node": "26.6.1",
+    "@types/react": "18.3.28",
+    "typescript": "6.0.3"
+  },
+  "exports": {
+    "./geometry": "./packages/vector-engine/src/portable/geometry.ts",
+    "./source": "./packages/parametric-source/src/index.ts"
+  }
+}
