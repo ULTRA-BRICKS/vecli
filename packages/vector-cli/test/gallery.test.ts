@@ -25,6 +25,28 @@ function goldenPath(name: string): string {
   return join(GALLERY_DIR, `${name}.svg`);
 }
 
+// Goldens are compared number by number: each may differ by 1e-9 times its magnitude (at least
+// 1e-9). The generators call Math.sin/cos/atan2, whose last bit differs between math libraries:
+// the goldens were rendered on macOS, and on the x86-64 Linux CI runner `burst` and `spiral` came
+// out 1-2 ULP apart (-29.99999999999999 vs -29.999999999999986). The text between the numbers
+// must match exactly. The count of numbers is covered by that split, and a real geometry change
+// moves coordinates by far more than 1e-9.
+const NUMBER = /-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi;
+const TOLERANCE = 1e-9;
+
+function expectSameGeometry(svg: string, golden: string): void {
+  const got = svg.trim();
+  const want = golden.trim();
+  expect(got.split(NUMBER)).toEqual(want.split(NUMBER));
+  const gotNumbers = (got.match(NUMBER) ?? []).map(Number);
+  const wantNumbers = (want.match(NUMBER) ?? []).map(Number);
+  const index = gotNumbers.findIndex(
+    (n, i) => Math.abs(n - wantNumbers[i]) > TOLERANCE * Math.max(1, Math.abs(wantNumbers[i])),
+  );
+  // On a mismatch, name the first coordinate that moved rather than dumping both SVGs.
+  expect(index === -1 ? null : { index, got: gotNumbers[index], golden: wantNumbers[index] }).toBeNull();
+}
+
 describe('vecli gallery visual regression (VECLI-8 / HYP-526)', () => {
   for (const entry of GALLERY) {
     describe(entry.name, () => {
@@ -38,8 +60,7 @@ describe('vecli gallery visual regression (VECLI-8 / HYP-526)', () => {
 
         // A missing golden is a hard failure (not auto-pass): regenerate with GALLERY_UPDATE=1.
         expect(existsSync(path)).toBe(true);
-        const golden = readFileSync(path, 'utf-8').trim();
-        expect(svg.trim()).toBe(golden);
+        expectSameGeometry(svg, readFileSync(path, 'utf-8'));
       });
 
       it('renders to a valid PNG via the resvg path', () => {
